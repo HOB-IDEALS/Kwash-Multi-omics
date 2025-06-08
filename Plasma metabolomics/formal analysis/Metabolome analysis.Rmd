@@ -1,0 +1,169 @@
+---
+title: "Plasma Metabolome FA analysis"
+author: "Bryan Gonzales"
+date: "2024-04-11"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the analysis of the plasma metabolomics data after factor analysis
+
+```{r cars}
+prot <- read.csv("CFA_metabolome_all.csv", header = TRUE, sep = ",")
+head(prot)
+```
+
+Perform kwash vs others analysis using conditional logistic regression at admission to determine which LV are interesting
+
+```{r}
+library(survival)
+library(dplyr)
+
+admission <- prot %>% filter(timepoint == "A")
+admission$Kall <- ifelse(admission$Group == "Kwash", 1, 0)
+table(admission$Kall, admission$Group)
+
+fit <- clogit(Kall ~ LMV7 + strata(Pair), data = admission)
+summary(fit)
+
+```
+Loop to do clogit in all LV's, extract estimate and FDR p-value
+
+```{r}
+
+GLM.run<-function(y) {
+  form <- as.formula(paste0("Kall ~ strata(Pair) +", y))
+  fit<-(clogit(form, data=admission))}
+
+GLMs.out <- lapply(colnames(admission[,c(11:26)]),GLM.run )
+results<-lapply(GLMs.out, function(x){summary(x)})
+results
+
+#extracting pValues and FDR correction
+results<-lapply(GLMs.out, function(x){coef(summary(x))[1,5]})
+pVal = as.matrix(results)
+rownames(pVal) = colnames(admission[11:26])
+fdr = as.matrix(p.adjust(as.vector(results), method ="fdr", n=16)) #n=number of metabolites
+pVal=cbind(pVal, fdr)
+colnames(pVal) = c("pVal", "fdr p")
+pVal <- as.matrix(pVal)
+View(as.data.frame(pVal))
+
+#extracting estimate
+results_est<-lapply(GLMs.out, function(x){coef(summary(x))[1,"exp(coef)"]}) #[x,4] change x to number of factors + 1
+estimate = as.matrix(results_est)
+rownames(estimate) = colnames(admission[11:26])
+View(as.data.frame(estimate))
+
+#extracting std error
+results_se<-lapply(GLMs.out, function(x){coef(summary(x))[1,"se(coef)"]}) #[x,4] change x to number of factors + 1
+stderror = as.matrix(results_se)
+rownames(stderror) = colnames(admission[11:26])
+View(as.data.frame(stderror))
+
+#compile statistics table
+uni_stat <- cbind(estimate, stderror, pVal)
+colnames(uni_stat) <- c("exp(estimate)", "std error", "pVal", "FDRpVal")
+View(as.data.frame(uni_stat))
+write.csv(uni_stat, file = "admission_clogit_matchstrata.csv")
+uni_stat
+```
+
+
+```{r}
+
+# Create a boxplot for each variable in the list
+library(gridExtra)
+library(ggplot2)
+
+variable_names <- colnames(admission)[-c(1:10,27)] # Exclude the 'Group' column
+
+# Create individual boxplots
+plot_list <- lapply(variable_names, function(variable) {
+  ggplot(admission, aes_string(x = "Group", y = variable)) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(x = "Group", y = variable) +
+    theme_minimal(base_size = 15) +
+    theme(legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+})
+
+# Arrange the boxplots in a 3x3 grid
+grid.arrange(grobs = plot_list, ncol = 4)
+```
+
+Only LV5 and LV7 pass criterion 1
+
+Second assessment, LV should be associated with severity of oedema
+
+```{r}
+
+kadmission <- admission %>% filter(Group == "Kwash")
+head(kadmission)
+
+kadmission$edema_s[kadmission$edema_s == "+"] <- 1
+kadmission$edema_s[kadmission$edema_s == "++"] <- 2
+kadmission$edema_s[kadmission$edema_s == "+++"] <- 3
+kadmission$edema_s <- as.factor(kadmission$edema_s)
+
+library(MASS)
+
+ol5 = polr(edema_s ~ LMV5, data=kadmission, Hess = TRUE)
+summary(ol5)
+(ctable <- coef(summary(ol5)))
+pval <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = pval))
+
+ol7 = polr(edema_s ~ LMV7, data=kadmission, Hess = TRUE)
+summary(ol7)
+(ctable <- coef(summary(ol7)))
+pval <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = pval))
+
+```
+Visualize it to make sure
+
+
+```{r}
+# Create individual boxplots
+plot_list <- lapply(variable_names, function(variable) {
+  ggplot(admission, aes_string(x = "edema_s", y = variable)) +
+    geom_boxplot(aes(fill = edema_s), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = variable, x = "Edema severity", y = variable) +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+})
+
+# Arrange the boxplots in a 3x3 grid
+grid.arrange(grobs = plot_list, ncol = 4)
+
+```
+
+
+Criterion 3, it should resolve over time
+
+```{r}
+
+boxplot(LMV5 ~ timepoint*Group, data =prot)
+boxplot(LMV7 ~ timepoint*Group, data =prot)
+
+library(lme4)
+library(lmerTest)
+
+resolve5 <- lmer(LMV5 ~ timepoint*Group + (1 | subjid), data = prot)
+summary(resolve5)
+
+resolve7 <- lmer(LMV7 ~ timepoint*Group + (1 | subjid), data = prot)
+summary(resolve7)
+
+table(prot$Group)
+
+```
+

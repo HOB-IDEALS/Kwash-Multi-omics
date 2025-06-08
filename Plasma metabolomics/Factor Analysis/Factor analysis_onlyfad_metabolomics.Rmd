@@ -1,0 +1,167 @@
+---
+title: "Factor Analysis Metabololics Kwash"
+author: "Bryan Gonzales"
+date: "2024-01-02"
+output: html_document
+---
+
+This is the analysis for the kwashiorkor MSF proteomics data using factor analysis.
+
+Load pre-processed data
+```{r}
+data <- read.table("MSCombine_plasma_metabolomics.csv", header = T, sep = ",")
+head(data)[1:15]
+colnames(data)[1:15]
+```
+We perform CFA per time point.
+
+Extract latent variables from admission data only
+
+```{r}
+library(dplyr)
+
+admission <- data %>% filter(timepoint == "A")
+
+demog <- admission[,c(1:10)]
+prot <- data.matrix(admission[,-c(1:10)])
+head(prot)[,1:5]
+```
+Perform exploratory factor analysis using fad package.
+
+First is to optimize factors to obtain a factor with least BIC
+
+```{r}
+library(fad)
+
+BICs <- rep(1,101)
+
+suppressWarnings({ for(i in 1:101){
+  out = fad(x = prot,factors = i-1, rotation = "varimax", lower = 0.005)
+  BICs[i] = out$BIC
+}
+})
+
+BICs
+plot(BICs)
+
+ind = which.min(BICs) # obtain the optimal factor favored with lowest BIC 
+
+ind
+```
+Based on the BIC, the optimal number of factors is 16. Hence, we run factor analysis using 16 factors
+
+```{r}
+
+out1 = fad(x = prot, factors = 16, scores = c("Bartlett"), rotation = "varimax", lower = 0.01)
+eig <- data.frame(out1$scores)
+head(eig)
+
+kdat <- cbind(demog, eig)
+head(kdat)
+
+write.csv(kdat, "factor_scores.csv", row.names = F)
+```
+
+Extract the loadings from FAD. Loadings are the contributions of each protein on the latent variable.
+```{r}
+
+loadings <- data.matrix(out1$loadings)
+head(loadings)
+
+proteins <- colnames(prot)
+
+rownames(loadings) <- proteins
+
+```
+
+We impose a factor loading cut-off. we will use 0.3. This means that proteins that have less than 0.3 loadings to the latent variable will be removed - leading behind only those proteins that are contributing highly to the latent variable.
+
+We then perform confirmatory factor analysis using lavaan using only strongly associated proteins per latent variable.
+
+Then, we extract a new scores matrix - the predicted factor so that each observation gets a value for each latent variable.
+
+```{r}
+
+load_cut <- loadings
+load_cut[load_cut < abs(0.3)] <- 0
+head(load_cut)
+
+write.csv(load_cut, "loadings_metabolomeFAD.csv")
+```
+
+Extract scores using the load_cut
+
+```{r}
+library(psych)
+
+fxad <- factor.scores(prot, load_cut, Phi = NULL, method = c("Bartlett"),rho=NULL,impute="none")
+
+scores_ad <- fxad$scores
+head(scores_ad)
+
+CFA_proteome_admission <- cbind(demog, scores_ad)
+
+colnames(CFA_proteome_admission)[11:26] <- c("LMV1", "LMV2", "LMV3", "LMV4", "LMV5", "LMV6", "LMV7", "LMV8", "LMV9",
+                                             "LMV10", "LMV11", "LMV12", "LMV13", "LMV14", "LMV15", "LMV16")
+head(CFA_proteome_admission)
+
+write.csv(CFA_proteome_admission, file= "CFA_metabolome_admission.csv", row.names=F)
+
+```
+
+Do the discharge and treated timepoints
+
+```{r}
+###Do discharge
+
+discharge <- data %>% filter(timepoint == "D")
+demog_d <- discharge[,c(1:10)]
+prot_d <- discharge[,-c(1:10)]
+
+fxd <- factor.scores(prot_d, load_cut, Phi = NULL, method = c("Bartlett"),rho=NULL,impute="none")
+
+scores_d <- fxd$scores
+head(scores_d)
+
+CFA_proteome_discharge <- cbind(demog_d, scores_d)
+colnames(CFA_proteome_discharge)[11:26] <- c("LMV1", "LMV2", "LMV3", "LMV4", "LMV5", "LMV6", "LMV7", "LMV8", "LMV9",
+                                             "LMV10", "LMV11", "LMV12", "LMV13", "LMV14", "LMV15", "LMV16")
+head(CFA_proteome_discharge)
+
+write.csv(CFA_proteome_discharge, file= "CFA_proteome_discharge.csv", row.names=F)
+
+###do treated
+
+treated <- data %>% filter(timepoint == "T")
+demog_t <- treated[,c(1:10)]
+prot_t <- treated[,-c(1:10)]
+
+fxt <- factor.scores(prot_t, load_cut, Phi = NULL, method = c("Bartlett"),rho=NULL,impute="none")
+
+scores_t <- fxt$scores
+head(scores_t)
+
+CFA_proteome_treated <- cbind(demog_t, scores_t)
+colnames(CFA_proteome_treated)[11:26] <- c("LMV1", "LMV2", "LMV3", "LMV4", "LMV5", "LMV6", "LMV7", "LMV8", "LMV9",
+                                             "LMV10", "LMV11", "LMV12", "LMV13", "LMV14", "LMV15", "LMV16")
+head(CFA_proteome_treated)
+
+write.csv(CFA_proteome_treated, file= "CFA_proteome_treated.csv", row.names=F)
+
+###combine
+
+CFA_proteome <- rbind(CFA_proteome_admission, CFA_proteome_discharge, CFA_proteome_treated)
+write.csv(CFA_proteome, file= "CFA_proteome_all.csv", row.names=F)
+
+```
+
+Try out some latent variables. Visualise difference among groups, across edema grades and resolution over time
+
+```{r}
+boxplot(CFA_proteome_admission$LMV7 ~ CFA_proteome_admission$Group)
+boxplot(CFA_proteome_admission$LMV7 ~ CFA_proteome_admission$edema_s)
+boxplot(CFA_proteome$LMV7 ~ CFA_proteome$Group*CFA_proteome$timepoint)
+boxplot(CFA_proteome$LMV7 ~ CFA_proteome$timepoint*CFA_proteome$Group)
+
+
+```
