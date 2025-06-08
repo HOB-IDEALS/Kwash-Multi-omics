@@ -1,0 +1,257 @@
+---
+title: "Factor Analysis of Kwashiorkor Proteomics Data"
+author: "Gerard Bryan Gonzales"
+output: html_document
+date: "2023-12-29"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the analysis for the kwashiorkor MSF proteomics data using factor analysis.
+
+Load pre-processed data
+
+```{r}
+
+data <- read.table("proteomics_processed.csv", header = T, sep = ",")
+head(data)[1:15]
+```
+
+We perform fad at admission
+
+Extract latent variables from admission data only
+
+```{r}
+library(dplyr)
+library(fad)
+
+admission <- data %>% filter(timepoint == "A")
+
+demog <- admission[,c(1:11)]
+prot <- data.matrix(admission[,-c(1:11)])
+head(prot)[,1:5]
+```
+
+Perform exploratory factor analysis using fad package.
+
+First is to optimize factors to obtain a factor with least BIC
+
+#```{r}
+library(fad)
+
+BICs <- rep(0,101) # first optimize factors ranging from 1 to 100
+
+for(i in 1:101){
+  out = fad(x = prot,factors = i-1, rotation = "promax") # x is the highly dimensional dataset where p>n
+  BICs[i] = out$BIC
+}
+
+BICs
+plot(BICs)
+
+ind = which.min(BICs) # obtain the optimal factor favored with lowest BIC 
+
+ind
+#```
+
+Based on the BIC, the optimal number of factors is 9. Hence, we run factor analysis using 9 factors
+
+```{r}
+
+out1 = fad(x = prot, factors = 9, scores = c("Bartlett"), rotation = "varimax", lower = 0.01) ## X is the data
+eig <- data.frame(out1$scores)
+head(eig)
+
+kdat <- cbind(demog, eig)
+head(kdat)
+
+write.csv(kdat, "factor_scores.csv", row.names = F)
+```
+
+Extract the loadings from FAD. Loadings are the contributions of each protein on the latent variable.
+```{r}
+
+loadings <- data.matrix(out1$loadings)
+head(loadings)
+
+proteins <- colnames(prot)
+
+rownames(loadings) <- proteins
+
+```
+
+We impose a factor loading cut-off. we will use 0.49. This means that proteins that have less than 0.4 loadings to the latent variable will be removed - leading behind only those proteins that are contributing highly to the latent variable.
+
+We then perform confirmatory factor analysis using lavaan using only strongly associated proteins per latent variable.
+
+Then, we extract a new scores matrix - the predicted factor so that each observation gets a value for each latent variable.
+
+```{r}
+
+load_cut <- loadings
+load_cut[load_cut < abs(0.49)] <- 0
+head(load_cut)
+
+write.csv(load_cut, "loadings_proteomeFAD.csv")
+```
+
+Extract scores using the load_cut
+
+```{r}
+library(psych)
+
+fxad <- factor.scores(prot, load_cut, Phi = NULL, method = c("Bartlett"),rho=NULL,impute="none")
+
+scores_ad <- fxad$scores
+head(scores_ad)
+
+CFA_proteome_admission <- cbind(demog, scores_ad)
+
+colnames(CFA_proteome_admission)[12:20] <- c("LV1", "LV2", "LV3", "LV4", "LV5", "LV6", "LV7", "LV8", "LV9")
+head(CFA_proteome_admission)
+
+write.csv(CFA_proteome_admission, file= "CFA_proteome_admission.csv", row.names=F)
+
+```
+
+
+Do the discharge and treated timepoints
+
+```{r}
+###Do discharge
+
+discharge <- data %>% filter(timepoint == "D")
+demog_d <- discharge[,c(1:11)]
+prot_d <- discharge[,-c(1:11)]
+
+fxd <- factor.scores(prot_d, load_cut, Phi = NULL, method = c("Bartlett"),rho=NULL,impute="none")
+
+scores_d <- fxd$scores
+head(scores_d)
+
+CFA_proteome_discharge <- cbind(demog_d, scores_d)
+colnames(CFA_proteome_discharge)[12:20] <- c("LV1", "LV2", "LV3", "LV4", "LV5", "LV6", "LV7", "LV8", "LV9")
+head(CFA_proteome_discharge)
+
+write.csv(CFA_proteome_discharge, file= "CFA_proteome_discharge.csv", row.names=F)
+
+###do treated
+
+treated <- data %>% filter(timepoint == "TRUE")
+demog_t <- treated[,c(1:11)]
+prot_t <- treated[,-c(1:11)]
+
+fxt <- factor.scores(prot_t, load_cut, Phi = NULL, method = c("Bartlett"),rho=NULL,impute="none")
+
+scores_t <- fxt$scores
+head(scores_t)
+
+CFA_proteome_treated <- cbind(demog_t, scores_t)
+colnames(CFA_proteome_treated)[12:20] <- c("LV1", "LV2", "LV3", "LV4", "LV5", "LV6", "LV7", "LV8", "LV9")
+head(CFA_proteome_treated)
+
+write.csv(CFA_proteome_treated, file= "CFA_proteome_treated.csv", row.names=F)
+
+###combine
+
+CFA_proteome <- rbind(CFA_proteome_admission, CFA_proteome_discharge, CFA_proteome_treated)
+write.csv(CFA_proteome, file= "CFA_proteome_all.csv", row.names=F)
+
+```
+
+Annotate the proteins
+
+```{r}
+#just to check the loadings
+
+
+annot <- read.csv("protein_annotation.csv", header = T, sep =",")
+loadings <- read.csv("loadings_proteomeFAD.csv", header = T, sep =",")
+head(loadings)
+
+colnames(loadings)[1] <- "Prot"
+head(loadings)
+
+loadings <- merge(loadings, annot, by = "Prot")
+head(loadings)
+
+write.csv(loadings, file = "loadings_proteomeFAD.csv", row.names = F)
+
+```
+
+Try out some latent variables. Visualise difference among groups, across edema grades and resolution over time
+
+```{r}
+boxplot(CFA_proteome_admission$LV7 ~ CFA_proteome_admission$Group)
+boxplot(CFA_proteome_admission$LV7 ~ CFA_proteome_admission$edema_s)
+boxplot(CFA_proteome$LV7 ~ CFA_proteome$Group*CFA_proteome$timepoint)
+boxplot(CFA_proteome$LV7 ~ CFA_proteome$timepoint*CFA_proteome$Group)
+
+boxplot(CFA_proteome_admission$LV3 ~ CFA_proteome_admission$Group)
+boxplot(CFA_proteome_admission$LV3 ~ CFA_proteome_admission$edema_s)
+boxplot(CFA_proteome$LV3 ~ CFA_proteome$Group*CFA_proteome$timepoint)
+boxplot(CFA_proteome$LV3 ~ CFA_proteome$timepoint*CFA_proteome$Group)
+
+```
+Confirm LV7 using CFA
+
+```{r}
+library(lavaan)
+
+model <- '
+  Factor1 =~ Prot242 + Prot413 + Prot660
+'
+
+# Fit the CFA model to the data
+fit <- cfa(model, data = admission)
+
+summary(fit, fit.measures = TRUE, standardized = TRUE)
+
+scurs <- predict(fit)
+
+```
+
+Correlate individual proteins with LV
+
+```{r}
+plot(CFA_proteome_admission$LV7, admission$Prot242)
+plot(CFA_proteome_admission$LV7, admission$Prot413)
+plot(CFA_proteome_admission$LV7, admission$Prot660)
+
+library(ggplot2)
+library(reshape2)
+library(Hmisc)
+
+heat <- cbind(CFA_proteome_admission$LV7, admission[c("Prot242", "Prot413", "Prot660")])
+
+colnames(heat) <- c("pLV7", "Gelsolin", "Lumican", "Tetranectin")
+
+# Calculate the correlation matrix and p-values using the Hmisc package
+cor_results <- rcorr(as.matrix(heat))
+cor_matrix <- cor_results$r
+p_matrix <- cor_results$P
+
+# Melt the correlation and p-value matrices
+cor_melted <- melt(cor_matrix)
+p_melted <- melt(p_matrix)
+colnames(cor_melted) <- c("Var1", "Var2", "Correlation")
+colnames(p_melted) <- c("Var1", "Var2", "p_value")
+
+# Merge the melted dataframes
+cor_p_data <- merge(cor_melted, p_melted, by = c("Var1", "Var2"))
+
+# Create the heatmap with correlation
+custom_colors <- colorRampPalette(c("white", "blue"))(100)
+
+w <- ggplot(data = cor_p_data, aes(x = Var1, y = Var2, fill = Correlation)) +
+  geom_tile() +  scale_fill_gradientn(colors = custom_colors) +
+    theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, vjust = 1, 
+                                   size = 12, hjust = 1)) +
+  coord_fixed()
+w
+```
+
+
