@@ -1,0 +1,378 @@
+---
+title: "Lipidome FA analysis"
+author: "Bryan Gonzales"
+date: "2024-04-11"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the analysis of the lipidomics data after factor analysis
+
+```{r cars}
+prot <- read.csv("CFA_lipidome_all.csv", header = TRUE, sep = ";")
+head(prot)
+
+library(dplyr)
+prot <- prot %>% filter(x == "")
+table(prot$Group, prot$timepoint)
+
+```
+
+Perform kwash vs others analysis using conditional logistic regression at admission to determine which LV are interesting
+
+```{r}
+library(survival)
+library(dplyr)
+
+admission <- prot %>% filter(timepoint == "A")
+admission$Kall <- ifelse(admission$Group == "Kwash", 1, 0)
+table(admission$Kall, admission$Group)
+
+fit <- clogit(Kall ~ lLV5 + strata(Pair), data = admission)
+summary(fit)
+
+```
+Loop to do clogit in all LV's, extract estimate and FDR p-value
+
+```{r}
+
+GLM.run<-function(y) {
+  form <- as.formula(paste0("Kall ~ strata(Pair) +", y))
+  fit<-(clogit(form, data=admission))}
+
+GLMs.out <- lapply(colnames(admission[,c(12:32)]),GLM.run )
+results<-lapply(GLMs.out, function(x){summary(x)})
+results
+
+#extracting pValues and FDR correction
+results<-lapply(GLMs.out, function(x){coef(summary(x))[1,5]})
+pVal = as.matrix(results)
+rownames(pVal) = colnames(admission[12:32])
+fdr = as.matrix(p.adjust(as.vector(results), method ="fdr", n=21)) #n=number of metabolites
+pVal=cbind(pVal, fdr)
+colnames(pVal) = c("pVal", "fdr p")
+pVal <- as.matrix(pVal)
+View(as.data.frame(pVal))
+
+#extracting estimate
+results_est<-lapply(GLMs.out, function(x){coef(summary(x))[1,"exp(coef)"]}) #[x,4] change x to number of factors + 1
+estimate = as.matrix(results_est)
+rownames(estimate) = colnames(admission[12:32])
+View(as.data.frame(estimate))
+
+#extracting std error
+results_se<-lapply(GLMs.out, function(x){coef(summary(x))[1,"se(coef)"]}) #[x,4] change x to number of factors + 1
+stderror = as.matrix(results_se)
+rownames(stderror) = colnames(admission[12:32])
+View(as.data.frame(stderror))
+
+#compile statistics table
+uni_stat <- cbind(estimate, stderror, pVal)
+colnames(uni_stat) <- c("exp(estimate)", "std error", "pVal", "FDRpVal")
+View(as.data.frame(uni_stat))
+write.csv(uni_stat, file = "admission_clogit_matchstrata.csv")
+uni_stat
+
+```
+```{r}
+
+variable_names <- paste0("lLV", 1:21)
+
+# Create a boxplot for each variable in the list
+library(gridExtra)
+library(ggplot2)
+
+variable_names <- colnames(admission)[-c(1:11,33)] # Exclude the 'Group' column
+
+# Create individual boxplots
+plot_list <- lapply(variable_names, function(variable) {
+  ggplot(admission, aes_string(x = "Group", y = variable)) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = variable, x = "Group", y = variable) +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+})
+
+# Arrange the boxplots in a 3x3 grid
+grid.arrange(grobs = plot_list, ncol = 8)
+
+
+
+```
+significant lLVs are: lLV 1, 2, 5, 10, 13:16 and 20 (9 lLVs)
+
+Second assessment, lLV that is different in kwash should be associated with severity of oedema
+
+```{r}
+
+kadmission <- admission %>% filter(Group == "Kwash")
+head(kadmission)
+
+kadmission$edema_s[kadmission$edema_s == "+"] <- 1
+kadmission$edema_s[kadmission$edema_s == "++"] <- 2
+kadmission$edema_s[kadmission$edema_s == "+++"] <- 3
+kadmission$edema_s <- as.factor(kadmission$edema_s)
+
+kadmission <- kadmission[,-c(14:15, 17:20, 22:23, 28:30, 32:33)]
+
+library(MASS)
+
+GLM.run<-function(y) {
+  form <- as.formula(paste0("edema_s ~ ", y))
+  fit<-( polr(form, data=kadmission, Hess = TRUE))}
+
+GLMs.out <- lapply(colnames(kadmission[,c(12:20)]),GLM.run )
+results<-lapply(GLMs.out, function(x){summary(x)})
+results
+
+#extracting tValues
+results<-lapply(GLMs.out, function(x){coef(summary(x))[1,"t value"]})
+tVal = as.matrix(results)
+rownames(tVal) = colnames(kadmission[12:20])
+
+#extracting estimate
+results_est<-lapply(GLMs.out, function(x){coef(summary(x))[1,"Value"]}) #[x,4] change x to number of factors + 1
+estimate = as.matrix(results_est)
+rownames(estimate) = colnames(admission[12:20])
+View(as.data.frame(estimate))
+
+#compile statistics table
+uni_stat <- as.matrix(cbind(estimate, tVal))
+colnames(uni_stat) <- c("estimate", "tVal")
+write.csv(uni_stat, file = "edemaGrade_polr_matchstrata.csv", row.names = F)
+
+#calculate pvalue
+
+polr <- read.csv("edemaGrade_polr_matchstrata.csv", header = T, sep = ",")
+polr$p_value <- pnorm(abs(polr$tVal), lower.tail = FALSE) * 2
+polr$fdr = p.adjust(polr$p_value, method ="fdr", n=9)
+polr
+rownames(polr) = colnames(kadmission[12:20])
+write.csv(polr, file = "edemaGrade_polr_matchstrata.csv")
+
+```
+```{r}
+
+# Create a boxplot for each variable in the list
+library(gridExtra)
+library(ggplot2)
+
+variable_names <- colnames(kadmission)[-c(1:11)] # Exclude the 'Group' column
+
+# Create individual boxplots
+plot_list <- lapply(variable_names, function(variable) {
+  ggplot(admission, aes_string(x = "edema_s", y = variable)) +
+    geom_boxplot(aes(fill = edema_s), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(x = "", y = variable) +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+})
+
+# Arrange the boxplots in a 3x3 grid
+grid.arrange(grobs = plot_list, ncol = 3)
+
+
+```
+Next, it should resolve over time
+
+```{r}
+
+res <- prot%>% filter(Group == "Kwash")
+
+boxplot(lLV7 ~ timepoint, data = res)
+
+
+library(lmerTest)
+
+resolvelLV5 <- lmer(lLV5 ~ timepoint + age + sex + (1 | subjid), data = res)
+summary(resolvelLV5)
+
+
+resolvelLV16 <- lmer(lLV16 ~ timepoint + age + sex + (1 | subjid), data = res)
+summary(resolvelLV16)
+
+
+```
+```{r}
+
+boxplot(lLV16 ~ timepoint*Group, data = prot)
+
+ggplot(prot, aes(x = interaction(timepoint, Group), y = lLV16)) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5,
+                 position = position_dodge(width = 1)) +
+    labs(title = "lLV5", x = "Follow-up", y = "lLV5") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+```
+
+
+Sensitivity analysis to test lLV5
+
+Remove malaria patients
+
+```{r}
+
+malaria <- c("P010", "P014", "P017", "P022", "P025", "P028", 
+                    "P031", "P034", "P035", "P038", "P046", "P047", 
+                    "P056", "P059", "P070", "P082", "P095", "P140", 
+                    "P167", "P170", "P179", "P182", "P184", "P187", 
+                    "P188", "PR02", "PR04")
+
+sensitivity <- admission %>% 
+  filter(!subjid %in% malaria)
+
+table(sensitivity$Group, sensitivity$timepoint)
+
+
+#different in kwashiorkor?
+
+fit <- clogit(Kall ~ lLV5 + strata(Pair), data = sensitivity)
+summary(fit)
+
+#plot
+
+ ggplot(sensitivity, aes_string(x = "Group", y = "lLV5")) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = "lLV5", x = "Group", y = "lLV5") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+#associated with oedema severity?
+
+sensitivity <- kadmission %>% 
+  filter(!sample %in% malaria)
+
+table(sensitivity$edema_s)
+
+ol = polr(edema_s ~ lLV5, data=sensitivity, Hess = TRUE)
+summary(ol)
+(ctable <- coef(summary(ol)))
+pval <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = pval))
+
+#plot
+
+ggplot(sensitivity, aes_string(x = "edema_s", y = "lLV5")) +
+    geom_boxplot(aes(fill = edema_s), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = "lLV5", x = "Edema severity", y = "lLV5") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+#resolve over time in kwashiorkor?
+
+LV5 <- prot[,c(1:11,16)]
+LV5k <- LV5%>% filter(Group == "Kwash")
+
+
+sensitivity <- LV5k %>% 
+  filter(!sample %in% malaria)
+
+table(sensitivity$timepoint)
+
+
+resolveS <- lmer(lLV5 ~ timepoint + age + sex + (1 | subjid), data = sensitivity)
+summary(resolveS)
+
+
+ggplot(sensitivity, aes(x = interaction(timepoint, Group), y = lLV5)) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5,
+                 position = position_dodge(width = 1)) +
+    labs(title = "lLV5", x = "Follow-up", y = "lLV5") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+
+```
+Only include kwashiorkor with negative urine protein and urine blood
+
+```{r}
+uprotsang <- c("P001A", "P004A", "P010A", "P034A", "P037A", "P043A", "P046A", "P052A", "P058A", "P061A", "P067A", 
+               "P073A", "P091A", "P097A", "P106A", "P109A", "P127A", "P145A", "P157A", "P160A", "P163A", "P166A", "P169A", "P175A", 
+               "P178A", "P184A", "P187A", "P190A", "P193A", "P196A", "P199A", "P202A")
+
+sensitivity <- admission %>% 
+  filter(!sample %in% uprotsang)
+
+table(sensitivity$Group)
+
+#different in kwashiorkor?
+
+fit <- clogit(Kall ~ lLV5 + strata(Pair), data = sensitivity)
+summary(fit)
+
+
+ggplot(sensitivity, aes_string(x = "Group", y = "lLV5")) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = "lLV5", x = "Group", y = "lLV5") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+
+
+#associated with oedema severity?
+
+sensitivity <- kadmission %>% 
+  filter(!sample %in% uprotsang)
+
+ol = polr(as.factor(edema_s) ~ lLV5 + age + sex, data=sensitivity, Hess = TRUE)
+summary(ol)
+(ctable <- coef(summary(ol)))
+pval <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = pval))
+
+table(sensitivity$edema_s)
+
+ggplot(sensitivity, aes_string(x = "edema_s", y = "lLV5")) +
+    geom_boxplot(aes(fill = edema_s), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = "lLV5", x = "Edema severity", y = "lLV5") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+
+#resolve over time in kwashiorkor?
+
+LV7 <- prot[,c(1:11,16)]
+LV7k <- LV7%>% filter(Group == "Kwash")
+
+
+sensitivity <- LV7k %>% 
+  filter(!sample %in% uprotsang)
+
+
+resolveS <- lmer(lLV5 ~ timepoint + age + sex + (1 | subjid), data = sensitivity)
+summary(resolveS)
+
+
+ggplot(sensitivity, aes(x = interaction(timepoint, Group), y = lLV5)) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5,
+                 position = position_dodge(width = 1)) +
+    labs(title = "lLV5", x = "Follow-up", y = "lLV5") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+```
+

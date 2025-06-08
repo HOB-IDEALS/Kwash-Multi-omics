@@ -1,0 +1,211 @@
+---
+title: "Lipidome univariable analysis"
+author: "Bryan Gonzales"
+date: "2024-04-11"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the unvariable analysis of the plasma lipidomics data
+
+```{r cars}
+prot <- read.csv("lipidome_plasma.csv", header = TRUE, sep = ",")
+head(prot)[,1:15]
+
+```
+
+Perform PCA
+
+```{r}
+
+# Perform PCA
+pca_result <- prcomp(prot[,-(1:11)])
+
+library(ggplot2)
+library(ggbiplot)
+library(ggrepel)
+
+# Prepare the data for plotting
+pca_data <- as.data.frame(pca_result$x)
+pca_data$group <- prot$Group
+
+# Plot the PCA results using ggplot2
+ggplot(pca_data, aes(x = PC1, y = PC2, color = group, label = group)) +
+  geom_point(aes(color = group)) +
+  #geom_text(vjust = 1.5, hjust = 1.5) +
+  theme_minimal() + geom_text_repel(aes(label = prot$subjid), max.overlaps = 10) +
+  labs(title = "PCA Plot", x = "Principal Component 1", y = "Principal Component 2") +
+  theme(legend.position = "right")
+
+#Remove severe outlier
+
+prot <- subset(prot, subjid != "P051")
+
+
+```
+
+
+Perform kwash vs others analysis using conditional logistic regression at admission to determine which LV are interesting
+
+```{r}
+library(survival)
+library(dplyr)
+
+admission <- prot %>% filter(timepoint == "A")
+admission$Kall <- ifelse(admission$Group == "Kwash", 1, 0)
+table(admission$Kall, admission$Group)
+
+```
+Loop to do clogit in all LV's, extract estimate and FDR p-value
+
+```{r}
+
+GLM.run<-function(y) {
+  form <- as.formula(paste0("Kall ~ strata(Pair) +", y))
+  fit<-(clogit(form, data=admission))}
+
+GLMs.out <- lapply(colnames(admission[,c(12:517)]),GLM.run )
+results<-lapply(GLMs.out, function(x){summary(x)})
+#results
+
+#extracting pValues and FDR correction
+results<-lapply(GLMs.out, function(x){coef(summary(x))[1,5]})
+pVal = as.matrix(results)
+rownames(pVal) = colnames(admission[12:517])
+fdr = as.matrix(p.adjust(as.vector(results), method ="fdr", n=506)) #n=number of metabolites
+pVal=cbind(pVal, fdr)
+colnames(pVal) = c("pVal", "fdr p")
+pVal <- as.matrix(pVal)
+#View(as.data.frame(pVal))
+
+#extracting estimate
+results_est<-lapply(GLMs.out, function(x){coef(summary(x))[1,"exp(coef)"]}) #[x,4] change x to number of factors + 1
+estimate = as.matrix(results_est)
+rownames(estimate) = colnames(admission[12:517])
+#View(as.data.frame(estimate))
+
+#extracting std error
+results_se<-lapply(GLMs.out, function(x){coef(summary(x))[1,"se(coef)"]}) #[x,4] change x to number of factors + 1
+stderror = as.matrix(results_se)
+rownames(stderror) = colnames(admission[12:517])
+#View(as.data.frame(stderror))
+
+#compile statistics table
+uni_stat <- cbind(estimate, stderror, pVal)
+colnames(uni_stat) <- c("exp(estimate)", "std error", "pVal", "FDRpVal")
+View(as.data.frame(uni_stat))
+write.csv(uni_stat, file = "admission_clogit_matchstrata.csv")
+
+```
+
+```{r}
+
+# Create a volcano plot for each variable in the list
+library(ggplot2)
+
+uni_stat <- as.data.frame(uni_stat)
+uni_stat$nlp <- -log10(as.numeric(uni_stat$FDRpVal))
+uni_stat$est <- log10(as.numeric(uni_stat$`exp(estimate)`))
+
+ggplot(uni_stat, aes(x = est, y = nlp)) +
+  geom_point(aes(color = ifelse(nlp > 1.3, "red", "grey")), size = 3) +
+  scale_color_identity() +  # Use the color column directly
+  theme_minimal() +
+  labs(title = "Volcano Plot", x = "Estimate (Log OR)", y = "-log10(p-value)") +
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "red") +  # Horizontal line for p-value threshold
+  geom_vline(xintercept = c(0,0), linetype = "dashed", color = "blue")       # Vertical lines for estimate thresholds  
+
+#create boxplot for weird protein
+
+boxplot(Lip139 ~ Group, admission)
+
+```
+
+Select variables with FDRpVal < 0.05
+
+Second assessment, protein should be associated with severity of oedema
+
+```{r}
+
+kadmission <- admission %>% filter(Group == "Kwash")
+#head(kadmission)
+
+kadmission$edema_s[kadmission$edema_s == "+"] <- 1
+kadmission$edema_s[kadmission$edema_s == "++"] <- 2
+kadmission$edema_s[kadmission$edema_s == "+++"] <- 3
+kadmission$edema_s <- as.factor(kadmission$edema_s)
+
+#select relevant proteins
+
+round2 <- rownames(uni_stat %>% filter(FDRpVal < 0.05))
+round2 <- cbind(kadmission[, 1:11], kadmission[,round2])
+View(round2)
+
+library(MASS)
+
+ol = polr(edema_s ~ Lip139, data=kadmission, Hess = TRUE)
+summary(ol)
+(ctable <- coef(summary(ol)))
+pval <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = pval))
+
+
+GLM.run<-function(y) {
+  form <- as.formula(paste0("edema_s ~ ", y))
+  fit<-( polr(form, data=round2, Hess = TRUE))}
+
+GLMs.out <- lapply(colnames(round2[,c(12:169)]),GLM.run )
+results<-lapply(GLMs.out, function(x){summary(x)})
+results
+
+#extracting tValues
+results<-lapply(GLMs.out, function(x){coef(summary(x))[1,"t value"]})
+tVal = as.matrix(results)
+rownames(tVal) = colnames(kadmission[12:169])
+
+#extracting estimate
+results_est<-lapply(GLMs.out, function(x){coef(summary(x))[1,"Value"]}) #[x,4] change x to number of factors + 1
+estimate = as.matrix(results_est)
+rownames(estimate) = colnames(admission[12:169])
+View(as.data.frame(estimate))
+
+#compile statistics table
+uni_stat <- as.matrix(cbind(estimate, tVal))
+colnames(uni_stat) <- c("estimate", "tVal")
+write.csv(uni_stat, file = "edemaGrade_polr_matchstrata.csv", row.names = F)
+
+#calculate pvalue
+
+polr <- read.csv("edemaGrade_polr_matchstrata.csv", header = T, sep = ",")
+polr$p_value <- pnorm(abs(polr$tVal), lower.tail = FALSE) * 2
+polr$fdr = p.adjust(polr$p_value, method ="fdr", n=158)
+polr
+rownames(polr) = colnames(admission[12:169])
+write.csv(polr, file = "edemaGrade_polr_matchstrata.csv")
+
+```
+No individual protein passes the test
+
+```{r}
+
+#Manhattan plot
+
+n = rep(1:nrow(polr))
+
+ggplot(polr, aes(x = n, y = -log10(fdr))) +
+  geom_point(aes(color = ifelse("grey")), size = 3) +
+  labs(title = "Manhattan Plot",
+       x = "Protein",
+       y = expression(-log[10](italic(P)))) +
+  theme_minimal() +
+  theme(legend.position = "none") + 
+  geom_hline(yintercept = 1.3, linetype = "dashed", color = "red") + 
+  coord_cartesian(ylim = c(0, 2))
+
+```
+```
