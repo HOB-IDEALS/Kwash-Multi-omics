@@ -1,0 +1,167 @@
+---
+title: "Urine metabolomics analysis using FAD"
+author: "Bryan Gonzales"
+date: "2024-04-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the analysis of urine metabolomics data using factor analysis approach. The positive and negative modes have been combined using MSCombine.
+
+```{r}
+
+data <- read.csv("MSCombine_urine_metabolomics.csv", header = T, sep = ",")
+colnames(data)[1:15]
+
+```
+Perform FAD analysis on combined positive and negative MS modes
+
+```{r}
+#first remove the demographic data
+
+meta <- as.matrix(data[,-c(1:9)])
+
+library(fad)
+
+BICs <- rep(0,101) # first optimize factors ranging from 1 to 100
+
+for(i in 1:101){
+  out = fad(x = meta,factors = i-1)
+  BICs[i] = out$BIC
+}
+
+BICs
+plot(BICs)
+
+ind = which.min(BICs) # obtain the optimal factor favored with lowest BIC 
+
+ind
+
+```
+
+Run FAD using the number of latent variables with the lowest BIC.
+
+```{r}
+out1 = fad(x = meta, factors = 8, scores = c("Bartlett"), rotation = "varimax") ## X is the data
+eig <- data.frame(out1$scores)
+head(eig)
+
+demog <- data[,1:9]
+kdat <- cbind(demog, eig)
+head(kdat)
+
+write.csv(kdat, "factor_scores.csv", row.names = F)
+
+#try out some LVs
+par(mfrow = c(2, 4))
+boxplot(X1 ~ Group, data = kdat)
+boxplot(X2 ~ Group, data = kdat)
+boxplot(X3 ~ Group, data = kdat)
+boxplot(X4 ~ Group, data = kdat)
+boxplot(X5 ~ Group, data = kdat)
+boxplot(X6 ~ Group, data = kdat)
+boxplot(X7 ~ Group, data = kdat)
+boxplot(X8 ~ Group, data = kdat)
+
+par(mfrow = c(1, 1))
+```
+
+Extract loadings
+```{r}
+load_cut <- data.matrix(out1$loadings)
+head(load_cut)
+
+rownames(load_cut) <- colnames(meta)
+
+```
+
+
+We impose a factor loading cut-off. we will use 0.49. This means that proteins that have less than 0.4 loadings to the latent variable will be removed - leading behind only those proteins that are contributing highly to the latent variable.
+
+We then perform confirmatory factor analysis using lavaan using only strongly associated proteins per latent variable.
+
+Then, we extract a new scores matrix - the predicted factor so that each observation gets a value for each latent variable.
+
+```{r}
+
+load_cut[load_cut < abs(0.49)] <- 0
+head(load_cut)
+
+write.csv(load_cut, "loadings_metabolomeFAD.csv")
+```
+
+Extract scores using the load_cut
+
+```{r}
+library(psych)
+
+fxad <- factor.scores(meta, load_cut, Phi = NULL, method = c("Bartlett"),rho=NULL,impute="none")
+
+scores_ad <- fxad$scores
+head(scores_ad)
+
+CFA_proteome_admission <- cbind(demog, scores_ad)
+
+colnames(CFA_proteome_admission)[10:17] <- c("uLV1", "uLV2", "uLV3", "uLV4", "uLV5", "uLV6", "uLV7", "uLV8")
+head(CFA_proteome_admission)
+
+write.csv(CFA_proteome_admission, file= "FAD_urine_metabolome.csv", row.names=F)
+
+```
+
+visualise network including clinical biochem using partial correlations
+
+```{r}
+
+clin <- read.csv("urine_clinicalBiochem.csv", header = T, sep = ",")
+head(clin)
+
+metclin <- merge(clin[,-c(2:5)], CFA_proteome_admission, by = "subjid")
+
+write.csv(metclin, file= "FAD_urine_metabolome_clinical.csv", row.names=F)
+head(metclin)
+```
+
+Perform partial correlation
+
+```{r}
+
+library(psych)
+library(qgraph)
+library(glasso)
+# Load example data (replace with your own dataset)
+colnames(metclin)
+ADclass2 <- metclin[,-c(1,8:15)]
+
+# Calculate partial correlations
+partial_cor <- cor_auto(ADclass2)
+
+# Create network plot
+qgraph(partial_cor, layout = "spring", minimum = 0.3)
+
+sparse_partial_cor <- glasso(partial_cor, rho = 0.1)
+
+# Create network plot
+qgraph(sparse_partial_cor, layout = "spring", minimum = 0.2, labels = colnames(ADclass2))
+qgraph(sparse_partial_cor, layout = "circle", minimum = 0.2, labels = colnames(ADclass2))
+```
+Visualize clin
+
+```{r}
+
+par(mfrow = c(2, 3))
+boxplot(log(K) ~ group, data = clin)
+boxplot(log(Na) ~ group, data = clin)
+boxplot(log(Cl) ~ group, data = clin)
+boxplot(log(Alb) ~ group, data = clin)
+boxplot(log(Urea) ~ group, data = clin)
+boxplot(log(Crea) ~ group, data = clin)
+
+par(mfrow = c(1, 1))
+
+```
+
+

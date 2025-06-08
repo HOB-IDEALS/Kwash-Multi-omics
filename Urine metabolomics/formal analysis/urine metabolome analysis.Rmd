@@ -1,0 +1,221 @@
+---
+title: "Plasma Metabolome FA analysis"
+author: "Bryan Gonzales"
+date: "2024-04-11"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This is the analysis of the urine metabolomics data after factor analysis
+
+```{r cars}
+prot <- read.csv("FAD_urine_metabolome.csv", header = TRUE, sep = ",")
+head(prot)
+colnames(prot)
+```
+Perform PCA on entire metabolome
+
+```{r}
+pca <- prcomp(prot[,-c(1:9)])
+prot$Group <- as.factor(prot$Group)
+scores <- as.data.frame(pca$x)
+
+# Combine scores with group information
+pca_df <- cbind(scores, Group = prot$Group)
+
+# Plot PCA using ggplot2
+library(ggplot2)
+
+ggplot(pca_df, aes(x = PC1, y = PC2, color = Group, label = Group)) +
+  geom_point(size = 3) +
+  labs(x = "PC1", y = "PC2", title = "PCA Plot") +
+  theme_minimal() +
+  scale_color_discrete(name = "Group", labels = c("Kwash", "Maras", "Nonmal")) # Add labels for color
+```
+
+
+Perform kwash vs others analysis using conditional logistic regression at admission to determine which LV are interesting
+
+```{r}
+library(survival)
+library(dplyr)
+
+prot$Kall <- ifelse(prot$Group == "Kwash", 1, 0)
+table(prot$Kall, prot$Group)
+
+fit <- clogit(Kall ~ ULMV1 + strata(Pair), data = prot)
+summary(fit)
+
+```
+Loop to do clogit in all LV's, extract estimate and FDR p-value
+
+```{r}
+
+GLM.run<-function(y) {
+  form <- as.formula(paste0("Kall ~ strata(Pair) +", y))
+  fit<-(clogit(form, data=prot))}
+
+GLMs.out <- lapply(colnames(prot[,c(10:17)]),GLM.run )
+results<-lapply(GLMs.out, function(x){summary(x)})
+results
+
+#extracting pValues and FDR correction
+results<-lapply(GLMs.out, function(x){coef(summary(x))[1,5]})
+pVal = as.matrix(results)
+rownames(pVal) = colnames(prot[,c(10:17)])
+fdr = as.matrix(p.adjust(as.vector(results), method ="fdr", n=8)) #n=number of metabolites
+pVal=cbind(pVal, fdr)
+colnames(pVal) = c("pVal", "fdr p")
+pVal <- as.matrix(pVal)
+View(as.data.frame(pVal))
+
+#extracting estimate
+results_est<-lapply(GLMs.out, function(x){coef(summary(x))[1,"exp(coef)"]}) #[x,4] change x to number of factors + 1
+estimate = as.matrix(results_est)
+rownames(estimate) = colnames(prot[,c(10:17)])
+View(as.data.frame(estimate))
+
+#extracting std error
+results_se<-lapply(GLMs.out, function(x){coef(summary(x))[1,"se(coef)"]}) #[x,4] change x to number of factors + 1
+stderror = as.matrix(results_se)
+rownames(stderror) = colnames(prot[,c(10:17)])
+View(as.data.frame(stderror))
+
+#compile statistics table
+uni_stat <- cbind(estimate, stderror, pVal)
+colnames(uni_stat) <- c("exp(estimate)", "std error", "pVal", "FDRpVal")
+View(as.data.frame(uni_stat))
+write.csv(uni_stat, file = "urine_clogit_matchstrata.csv")
+uni_stat
+```
+
+
+```{r}
+variable_names <- colnames(prot)[c(10:17)]
+
+library(ggplot2)
+library(gridExtra)
+
+# Create individual boxplots
+plot_list <- lapply(variable_names, function(variable) {
+  ggplot(prot, aes_string(x = "Group", y = variable)) +
+    geom_boxplot(aes(fill = Group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = variable, x = "Group", y = variable) +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+})
+
+# Arrange the boxplots in a 3x3 grid
+grid.arrange(grobs = plot_list, ncol = 4)
+
+```
+
+Only ULV1 
+
+Second assessment, LV should be associated with severity of oedema
+
+```{r}
+
+prot$edema_s[prot$edema_s == "+"] <- 1
+prot$edema_s[prot$edema_s == "++"] <- 2
+prot$edema_s[prot$edema_s == "+++"] <- 3
+prot$edema_s <- as.factor(prot$edema_s)
+
+library(MASS)
+filtered_data <- subset(prot, edema_s == 1 | edema_s == 2 | edema_s == 3)
+
+ol1 = polr(edema_s ~ ULMV1 + age + sex + triage, data=filtered_data, Hess = TRUE)
+summary(ol1)
+(ctable <- coef(summary(ol1)))
+pval <- pnorm(abs(ctable[, "t value"]), lower.tail = FALSE) * 2
+(ctable <- cbind(ctable, "p value" = pval))
+
+
+```
+Visualize it to make sure
+
+```{r}
+boxplot(ULMV1 ~ Group, data = prot)
+boxplot(ULMV1 ~ edema_s, data = prot)
+
+ggplot(prot, aes(x = edema_s, y = ULMV1)) +
+    geom_boxplot(aes(fill = edema_s), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(x = "edema_s", y = "uLV1") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+
+```
+
+
+
+See contribution of ULMV1 to PC1
+
+```{r}
+
+plot(pca_df$PC2, prot$ULMV1)
+
+```
+
+Regroup and check if LV1 is associated with SAM
+
+```{r}
+prot$sam <- as.factor(ifelse(prot$Group == "Nonmal", 0, 1))
+table(prot$sam, prot$Group)
+
+fit <- clogit(sam ~ ULMV1 + strata(Pair), data = prot)
+summary(fit)
+
+boxplot(ULMV1 ~ sam, prot)
+
+
+ggplot(prot, aes(x = sam, y = ULMV1)) +
+    geom_boxplot(aes(fill = sam), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(x = "sam", y = "uLV1") +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+
+```
+
+Run partial correlation network analysis to integrate metabolomics and clinical biochemisty
+
+```{r}
+
+clin <- read.csv("FAD_urine_metabolome_clinical.csv", header = TRUE, sep = ";")
+head(clin)
+
+
+library(psych)
+library(qgraph)
+library(glasso)
+
+ADclass2 <- clin[,-c(1,8:15)]
+
+# Calculate partial correlations
+partial_cor <- cor_auto(ADclass2)
+
+# Create network plot
+qgraph(partial_cor, layout = "spring", minimum = 0.3)
+
+sparse_partial_cor <- glasso(partial_cor, rho = 0.1)
+
+# Create network plot
+qgraph(sparse_partial_cor, layout = "spring", minimum = 0.2, labels = colnames(ADclass2))
+qgraph(sparse_partial_cor, layout = "circle", minimum = 0.2, labels = colnames(ADclass2))
+
+
+
+```
+
+
