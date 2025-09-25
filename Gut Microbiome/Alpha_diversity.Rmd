@@ -1,0 +1,36 @@
+---
+title: "Gut microbiome analysis"
+author: "the bryan"
+date: "2024-08-15"
+output: html_document
+---
+
+```{r}
+
+alpha <- read.csv("Alpha_diversity.csv", header = T, sep = ";")
+
+head(alpha)
+
+# Create a boxplot for each variable in the list
+library(gridExtra)
+library(ggplot2)
+
+variable_names <- colnames(alpha)[-c(1:6)] # Exclude the 'Group' column
+
+# Create individual boxplots
+plot_list <- lapply(variable_names, function(variable) {
+  ggplot(alpha, aes_string(x = "group", y = variable)) +
+    geom_boxplot(aes(fill = group), color = "black", outlier.shape = 21, outlier.size = 2, width = 0.5) +
+    labs(title = variable, x = "Group", y = variable) +
+    theme_minimal(base_size = 15) +
+    theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+          legend.position = "none") +
+    scale_fill_brewer(palette = "Set3")
+})
+
+# Arrange the boxplots in a 3x3 grid
+grid.arrange(grobs = plot_list, ncol = 2)
+
+
+
+```
