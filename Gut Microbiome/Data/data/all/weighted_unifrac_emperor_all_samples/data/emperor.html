@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Weighted UniFrac PCoA plot</title>
+    <!-- core dependencies that are otherwise included via the jupyter notebook -->
+    <script src="./vendor/js/require-2.1.22.min.js"></script>
+    <script src="./vendor/js/jquery-2.1.4.min.js"></script>
+    <meta charset="utf-8">
+
+    <script type="text/javascript">
+
+if ($("#emperor-css").length == 0){{
+    $("head").append([
+
+        '<link id="emperor-css" rel="stylesheet" type="text/css" href="./css/emperor.css">',
+        '<link rel="stylesheet" type="text/css" href="./vendor/css/jquery-ui.min.css">',
+        '<link rel="stylesheet" type="text/css" href="./vendor/css/slick.grid.min.css">',
+        '<link rel="stylesheet" type="text/css" href="./vendor/css/spectrum.min.css">',
+        '<link rel="stylesheet" type="text/css" href="./vendor/css/chosen.min.css">',
+        '<link rel="stylesheet" type="text/css" href="./vendor/css/jquery.contextMenu.min.css">'
+    ]);
+}}
+</script>
+
+
+    <style>
+      #emperor-notebook-0x79d03ee7 {
+        height:100vh !important;
+        padding: 0px !important;
+      }
+      body {
+        margin: 0;
+        padding: 0;
+        border: 0;
+        outline: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id='emperor-notebook-0x79d03ee7' style="position: relative; width:100%; height:500px;">
+  <div class='loading' style="position: absolute;top: 50%;left: 50%;margin-left: -229px; margin-top: -59px; z-index: 10000;height:118px;width:458px;padding:0px"><img src='./img/emperor.png' alt='Emperor resources missing. Expected them to be found in .'></div>
+</div>
+</div>
+
+<script type="text/javascript">
+// When running in the Jupyter notebook we've encountered version conflicts
+// with some dependencies. So instead of polluting the global require context,
+// we define a new context.
+var emperorRequire = require.config({
+'context': 'emperor',
+// the left side is the module name, and the right side is the path
+// relative to the baseUrl attribute, do NOT include the .js extension
+'paths': {
+  /* jQuery */
+  'jquery': './vendor/js/jquery-2.1.4.min',
+  'jqueryui': './vendor/js/jquery-ui.min',
+  'jquery_drag': './vendor/js/jquery.event.drag-2.2.min',
+
+  /* jQuery plugins */
+  'chosen': './vendor/js/chosen.jquery.min',
+  'spectrum': './vendor/js/spectrum.min',
+  'position': './vendor/js/jquery.ui.position.min',
+  'contextmenu': './vendor/js/jquery.contextMenu.min',
+
+  /* other libraries */
+  'underscore': './vendor/js/underscore-min',
+  'chroma': './vendor/js/chroma.min',
+  'filesaver': './vendor/js/FileSaver.min',
+  'blob': './vendor/js/Blob',
+  'canvastoblob': './vendor/js/canvas-toBlob',
+  'd3': './vendor/js/d3.min',
+
+  /* THREE.js and plugins */
+  'three': './vendor/js/three.min',
+  'orbitcontrols': './vendor/js/three.js-plugins/OrbitControls',
+  'projector': './vendor/js/three.js-plugins/Projector',
+  'svgrenderer': './vendor/js/three.js-plugins/SVGRenderer',
+  'canvasrenderer': './vendor/js/three.js-plugins/CanvasRenderer',
+
+  /* SlickGrid */
+  'slickcore': './vendor/js/slick.core.min',
+  'slickgrid': './vendor/js/slick.grid.min',
+  'slickformatters': './vendor/js/slick.editors.min',
+  'slickeditors': './vendor/js/slick.formatters.min',
+  'slickdataview': './vendor/js/slick.dataview.min',
+
+  /* Emperor's objects */
+  'util': './js/util',
+  'model': './js/model',
+  'multi-model': './js/multi-model',
+  'view': './js/view',
+  'controller': './js/controller',
+  'draw': './js/draw',
+  'scene3d': './js/sceneplotview3d',
+  'shapes': './js/shapes',
+  'animationdirector': './js/animate',
+  'trajectory': './js/trajectory',
+  'uistate': './js/ui-state',
+
+  /* controllers */
+  'abcviewcontroller': './js/abc-view-controller',
+  'viewcontroller': './js/view-controller',
+  'colorviewcontroller': './js/color-view-controller',
+  'visibilitycontroller': './js/visibility-controller',
+  'opacityviewcontroller': './js/opacity-view-controller',
+  'scaleviewcontroller': './js/scale-view-controller',
+  'shapecontroller': './js/shape-controller',
+  'axescontroller': './js/axes-controller',
+  'animationscontroller': './js/animations-controller',
+
+  /* editors */
+  'shape-editor': './js/shape-editor',
+  'color-editor': './js/color-editor',
+  'scale-editor': './js/scale-editor'
+
+},
+/*
+   Libraries that are not AMD compatible need shim to declare their
+   dependencies.
+ */
+'shim': {
+  'jquery_drag': {
+    'deps': ['jquery', 'jqueryui']
+  },
+  'chosen': {
+    'deps': ['jquery'],
+    'exports': 'jQuery.fn.chosen'
+  },
+  'contextmenu' : {
+    'deps': ['jquery', 'jqueryui', 'position']
+  },
+  'filesaver' : {
+    'deps': ['blob']
+  },
+  'canvastoblob' : {
+    'deps': ['blob']
+  },
+  'slickcore': ['jqueryui'],
+  'slickgrid': ['slickcore', 'jquery_drag', 'slickformatters', 'slickeditors',
+                'slickdataview']
+}
+});
+
+emperorRequire(
+["jquery", "model", "controller"],
+function($, model, EmperorController) {
+  var DecompositionModel = model.DecompositionModel;
+
+  var div = $('#emperor-notebook-0x79d03ee7');
+
+  var data = {"plot": {"decomposition": {"axes_names": [0, 1, 2, 3, 4], "ci": null, "coordinates": [[-0.9023814510503644, -0.3499513005152413, 0.018138043257243948, -0.15900343750069487, 0.056478005019020866], [-0.6385551421209068, -0.023373748258630294, 0.3588541935660163, 0.3238203078936489, -0.022258618794192563], [-0.35706558303438085, -0.7089470191966131, 0.14544565420951153, -0.05180544125426345, 0.04707754004120564], [-0.8976472508461709, 0.5831523030715767, 0.06265849368807906, 0.21691733989703388, -0.18217938920855375], [0.9223121574614586, 0.0870455879704481, 0.58351723879311, -0.06966225931037476, 0.0044294036808569205], [-0.9255294042304457, 0.7007718577392078, 0.5997732579762146, 0.223450448786553, 0.19882767796097736], [-0.9693384743752967, 0.8544027660876558, 0.32975946172957726, 0.15739711185651814, -0.13871572940335494], [0.31594055368599494, 0.056599702023807576, -0.05843105007534693, 0.14972749651963754, 0.24426423473849562], [0.6531218659098458, 0.018041270015458855, 0.1817431346342104, -0.1700447553937212, -0.1373562587046515], [-0.36890638123438274, 0.474771012252116, -0.540463043473256, 0.030603458289919748, 0.19912660688729422], [-0.2665415120899936, 0.05095914303158044, -0.5781569709383775, 0.3503323285830766, 0.21008088360136506], [0.9030659681052051, 0.03654010204598386, 0.2802529634815933, -0.320681997277053, 0.009269108206277122], [1.0, 0.17827662998876345, 0.01818699638285379, 0.034588376212043706, -0.1354325059027051], [-0.9856356821458708, -0.0859967585392743, 0.4624176882051564, 0.3792996650377843, 0.07153008853053823], [0.16302360102923596, -0.22128548949845298, -0.4937748707567635, 0.494904258750664, 0.12400650298300447], [0.740774589250916, 0.09948412038266159, 0.20412850772199612, -0.21834319686325926, -0.06741601009122387], [-0.8353608808014588, -0.38662226181587594, 0.0673001350863601, -0.14613228003526815, -0.05423427714743091], [-0.1276663732174156, -0.5834366434937535, -0.27770227888930726, 0.09216022371803774, 0.4067415679252642], [0.45006683976268314, -0.25498502450471244, -0.04279373402199535, -0.14728310818213977, -0.062395632713319486], [-0.02364061375623636, -0.30899146797322014, -0.25397932477843466, 0.2125814806339548, -0.016232549510158987], [-0.8687836089400642, 0.30417403618299, -0.3182991464060837, -0.5448966232918427, -0.08500545827933445], [0.015802702245372793, -0.38850922316632047, -0.14809858031713943, 0.23341922110159136, 0.030741908744583466], [0.11375103310333189, 0.37155679675474346, -0.2537006636435649, 0.05354977293618323, -0.46402643405451494], [0.8378272563599793, 0.15684280072198323, 0.08808488942622916, -0.16360902704749475, 0.18420775718512014], [-0.27064572634641565, -0.3677651897028549, 0.34980621787122973, 0.22983858289145617, -0.141398707629681], [0.8981811651046643, 0.06578031521491233, 0.0566171153639482, -0.06664814908151993, -0.03639789277916357], [0.19155710773565707, 0.18566725810225215, -0.24898776389545876, 0.1673951232379112, -0.23749032837812442], [0.13425064151010443, -0.18515794879726244, 0.056805362814812375, -0.05618163902356772, 0.04149927128220889], [0.4460175366254807, 0.13159676754406563, -0.1757624618208983, -0.009021741911737371, 0.1547211811992588], [0.2805511420564421, -0.4474984162358528, -0.15671537707350539, 0.057201588098978455, -0.3409117502460632], [0.8328220149691318, 0.059662078366759234, 0.09306769507147118, -0.02775781095952781, 0.2726618111985716], [-0.9492421057346385, 0.06413454977342307, -0.14955780235942465, -0.2644942080115498, -0.19575153031479325], [0.5012982797183166, 0.07808179163802831, -0.01059858208823991, 0.04865206977690863, 0.39183509246240367], [0.5043236004893686, 0.28078850073069983, 0.06820063163727759, 0.20063250159974627, -0.08686491590561886], [0.2474688007470737, 0.4530964379206451, -0.09620886161109692, -0.14147838437754673, 0.3796716111635791], [0.380231137055088, -0.4360786705420444, -0.05820071650882135, 0.10461605728588827, -0.402869970922497], [-0.9804438278380536, 0.16610615970077963, -0.26222680025463074, -0.366553428337378, -0.16413787373597225], [-0.24069785787769635, 0.7064678760512766, -0.24911168264503217, -0.411737457544366, 0.11851666029773619], [0.6555914240848018, 0.1662779287952368, 0.14514415559509614, -0.013084909154470515, 0.1019560588901143], [0.7523032060154964, -0.04137204482650694, -0.1453172760326171, 0.12240438684959896, -0.4749645895930577], [-0.5533237430755916, -0.863601010873454, 0.1647029827330149, -0.3330932539527157, 0.13526613931635176], [-0.7788770043102671, -0.676705574166981, 0.18348216834499587, -0.20197869144664066, 0.06313131200018003]], "edges": [], "percents_explained": [45.215272832710276, 15.951566950537982, 7.8437471988755005, 5.50700093579066, 4.673357144079941], "sample_ids": ["1", "10", "11", "12", "13", "14", "15", "16", "17", "18", "19", "2", "20", "22", "23", "24", "25", "26", "27", "28", "29", "3", "30", "31", "32", "33", "34", "35", "36", "37", "38", "39", "4", "40", "41", "42", "43", "5", "6", "7", "8", "9"]}, "metadata": [["1", "M-023-G", "8.0", "23", "Marasmus", "13/11/2018", "1.0", "6-23m", "M", "Jaune", "109.0"], ["10", "M-008-G", "3.0", "8", "Marasmus", "13/11/2018", "1.0", "6-23m", "M", "Rouge", "113.0"], ["11", "K-007-G", "3.0", "7", "Kwashiorkor", "27/09/2018", "1.0", "6-23m", "M", "Rouge", "118.0"], ["12", "N-054-G", "18.0", "54", "Non-malnourished", "15/11/2018", "1.0", "6-23m", "F", "Vert", "81.0"], ["13", "N-030-G", "10.0", "30", "Non-malnourished", "16/11/2018", "1.0", "6-23m", "M", "Jaune", "126.0"], ["14", "N-033-G", "11.0", "33", "Non-malnourished", "19/11/2018", "1.0", "6-23m", "M", "Jaune", "130.0"], ["15", "M-R02-G", "24.0", "R02", "Marasmus", "29/11/2018", "1.0", "6-23m", "F", "Jaune", "109.0"], ["16", "K-091-G", "31.0", "91", "Kwashiorkor", "24/12/2018", "2.0", "24-59 m", "M", "Jaune", "131.0"], ["17", "N-084-G", "28.0", "84", "Non-malnourished", "02/01/2019", "2.0", "24-59 m", "M", "Jaune", "64.0"], ["18", "K-106-G", "36.0", "106", "Kwashiorkor", "21/01/2019", "1.0", "6-23m", "M", "Vert", "185.0"], ["19", "K-124-G", "42.0", "124", "Kwashiorkor", "21/02/2019", "1.0", "6-23m", "M", "Vert", "137.0"], ["2", "K-013-G", "5.0", "13", "Kwashiorkor", "02/10/2018", "1.0", "6-23m", "F", "Jaune", "67.0"], ["20", "N-123-G", "41.0", "123", "Non-malnourished", "25/02/2019", "1.0", "6-23m", "M", "Vert", "115.0"], ["22", "M-050-G", "17.0", "50", "Marasmus", "14/03/2019", "1.0", "6-23m", "M", "Jaune", "144.0"], ["23", "K-133-G", "45.0", "133", "Kwashiorkor", "18/04/2019", "2.0", "24-59 m", "F", "Vert", "132.0"], ["24", "N-135-G", "45.0", "135", "Non-malnourished", "19/04/2019", "2.0", "24-59 m", "F", "Vert", "125.0"], ["25", "N-R21-G", "3.0", "R21", "Non-malnourished", "02/05/2019", "1.0", "6-23m", "M", "Rouge", "213.0"], ["26", "K-139-G", "47.0", "139", "Kwashiorkor", "02/05/2019", "2.0", "24-59 m", "M", "Jaune", "155.0"], ["27", "M-143-G", "48.0", "143", "Marasmus", "06/06/2019", "2.0", "24-59 m", "F", "Vert", "119.0"], ["28", "K-148-G", "50.0", "148", "Kwashiorkor", "15/07/2019", "1.0", "6-23m", "M", "Vert", "105.0"], ["29", "M-149-G", "50.0", "149", "Marasmus", "16/07/2019", "1.0", "6-23m", "M", "Vert", "145.0"], ["3", "K-016-G", "6.0", "16", "Kwashiorkor", "03/10/2018", "2.0", "24-59 m", "M", "Jaune", "87.0"], ["30", "K-151-G", "51.0", "151", "Kwashiorkor", "18/07/2019", "2.0", "24-59 m", "F", "Vert", "112.0"], ["31", "N-153-G", "51.0", "153", "Non-malnourished", "26/07/2019", "2.0", "24-59 m", "F", "Vert", "127.0"], ["32", "M-161-G", "54.0", "161", "Marasmus", "29/07/2019", "1.0", "6-23m", "F", "Vert", "132.0"], ["33", "N-159-G", "53.0", "159", "Non-malnourished", "30/07/2019", "2.0", "24-59 m", "M", "Vert", "92.0"], ["34", "K-172-G", "58.0", "172", "Kwashiorkor", "08/08/2019", "1.0", "6-23m", "F", "Jaune", "117.0"], ["35", "N-117-G", "39.0", "117", "Non-malnourished", "11/09/2019", "2.0", "24-59 m", "M", "Jaune", "97.0"], ["36", "M-083-G", "28.0", "83", "Marasmus", "27/09/2019", "2.0", "24-59 m", "M", "Jaune", "114.0"], ["37", "M-140-G", "47.0", "140", "Marasmus", "02/10/2019", "2.0", "24-59 m", "M", "Jaune", "117.0"], ["38", "M-188-G", "63.0", "188", "Marasmus", "03/10/2019", "2.0", "24-59 m", "F", "Jaune", "117.0"], ["39", "M-185-G", "62.0", "185", "Marasmus", "03/10/2019", "2.0", "24-59 m", "M", "Jaune", "242.0"], ["4", "N-018-G", "6.0", "18", "Non-malnourished", "08/10/2018", "2.0", "24-59 m", "M", "Jaune", "94.0"], ["40", "K-202-G", "68.0", "202", "Kwashiorkor", "07/10/2019", "1.0", "6-23m", "F", "Vert", "143.0"], ["41", "N-R27-G", "16.0", "R27", "Non-malnourished", "28/10/2019", "2.0", "24-59 m", "M", "Jaune", "210.0"], ["42", "N-R29-G", "11.0", "R29", "Non-malnourished", "30/10/2019", "1.0", "6-23m", "M", "Jaune", "129.0"], ["43", "N-R28-G", "10.0", "R28", "Non-malnourished", "30/10/2019", "1.0", "6-23m", "M", "Jaune", "197.0"], ["5", "M-017-G", "6.0", "17", "Marasmus", "09/10/2018", "2.0", "24-59 m", "M", "Jaune", "108.0"], ["6", "M-020-G", "7.0", "20", "Marasmus", "17/10/2018", "1.0", "6-23m", "F", "Vert", "114.0"], ["7", "K-028-G", "10.0", "28", "Kwashiorkor", "24/10/2018", "1.0", "6-23m", "M", "Jaune", "101.0"], ["8", "K-055-G", "19.0", "55", "Kwashiorkor", "07/11/2018", "2.0", "24-59 m", "M", "Jaune", "109.0"], ["9", "K-049-G", "17.0", "49", "Kwashiorkor", "07/11/2018", "1.0", "6-23m", "M", "Jaune", "106.0"]], "metadata_headers": ["SampleID", "sample_code", "match_id", "subject_id", "group", "recruit_date", "age_group", "age", "sex", "triage", "sample_weight_mg"], "settings": {}, "type": "scatter"}};
+
+  var plot, biplot = null, ec;
+
+  function init() {
+    // Initialize the DecompositionModel for the scatter plot, and optionally
+    // add one for the biplot arrows
+    plot = new DecompositionModel(data.plot.decomposition,
+                                  data.plot.metadata_headers,
+                                  data.plot.metadata,
+                                  data.plot.type);
+
+    if (data.biplot) {
+      biplot = new DecompositionModel(data.biplot.decomposition,
+                                      data.biplot.metadata_headers,
+                                      data.biplot.metadata,
+                                      data.biplot.type);
+    }
+
+    ec = new EmperorController(plot, biplot, "emperor-notebook-0x79d03ee7");
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+    ec.render();
+  }
+  $(window).resize(function() {
+    ec.resize(div.innerWidth(), div.innerHeight());
+  });
+
+  $(function(){
+    init();
+    animate();
+
+    ec.ready = function () {
+      // any other code that needs to be executed when emperor is loaded should
+      // go here
+      ec.loadConfig(data.plot.settings);
+    }
+  });
+
+}); // END REQUIRE.JS block
+</script>
+  </body>
+</html>
