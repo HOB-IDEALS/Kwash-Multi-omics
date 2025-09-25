@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Beta group significance: Bray-Curtis</title>
+    <link rel="stylesheet" href="./q2templateassets/css/bootstrap.min.css"/>
+    <link rel="stylesheet" href="./q2templateassets/css/normalize.css"/>
+    <link rel="stylesheet" href="./q2templateassets/css/base-template.css"/>
+    <script src="./q2templateassets/js/jquery-3.2.0.min.js" charset="utf-8"></script>
+    <script src="./q2templateassets/js/bootstrap.min.js" charset="utf-8"></script>
+    
+    
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div id="q2templatesheader" class="row">
+        <div class="col-lg-12">
+          <a href="http://qiime2.org/">
+            <img src="./q2templateassets/img/qiime2-rect-200.png"
+            alt="QIIME 2">
+          </a>
+        </div>
+      </div>
+        
+  
+
+  <div class="row">
+    <div class="col-lg-12">
+      <h2>Overview</h2>
+      <table border="0" class="dataframe table table-striped table-hover">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>PERMANOVA results</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>method name</th>
+      <td>PERMANOVA</td>
+    </tr>
+    <tr>
+      <th>test statistic name</th>
+      <td>pseudo-F</td>
+    </tr>
+    <tr>
+      <th>sample size</th>
+      <td>42</td>
+    </tr>
+    <tr>
+      <th>number of groups</th>
+      <td>3</td>
+    </tr>
+    <tr>
+      <th>test statistic</th>
+      <td>1.15559</td>
+    </tr>
+    <tr>
+      <th>p-value</th>
+      <td>0.166</td>
+    </tr>
+    <tr>
+      <th>number of permutations</th>
+      <td>999</td>
+    </tr>
+  </tbody>
+</table>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-12">
+      <h2>Group significance plots</h2>
+      <a href="raw_data.tsv" target="_blank" rel="noopener noreferrer">
+        Download raw data as TSV
+      </a>
+      
+        <div class="row">
+          
+            <div class="col-lg-4 text-center">
+              <a href="Kwashiorkor-boxplots.pdf">
+                <img src="Kwashiorkor-boxplots.png">
+                <br>
+                <p>Download as PDF</p>
+              </a>
+            </div>
+          
+            <div class="col-lg-4 text-center">
+              <a href="Marasmus-boxplots.pdf">
+                <img src="Marasmus-boxplots.png">
+                <br>
+                <p>Download as PDF</p>
+              </a>
+            </div>
+          
+            <div class="col-lg-4 text-center">
+              <a href="Non-malnourished-boxplots.pdf">
+                <img src="Non-malnourished-boxplots.png">
+                <br>
+                <p>Download as PDF</p>
+              </a>
+            </div>
+          
+        </div>
+      
+    </div>
+  </div>
+
+  
+    <div class="row">
+      <div class="col-lg-12">
+        <h2>Pairwise permanova results</h2>
+        <a href="permanova-pairwise.csv">Download CSV</a>
+        <table border="0" class="dataframe table table-striped table-hover">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th></th>
+      <th>Sample size</th>
+      <th>Permutations</th>
+      <th>pseudo-F</th>
+      <th>p-value</th>
+      <th>q-value</th>
+    </tr>
+    <tr>
+      <th>Group 1</th>
+      <th>Group 2</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th rowspan="2" valign="top">Kwashiorkor</th>
+      <th>Marasmus</th>
+      <td>28</td>
+      <td>999</td>
+      <td>1.289866</td>
+      <td>0.116</td>
+      <td>0.174</td>
+    </tr>
+    <tr>
+      <th>Non-malnourished</th>
+      <td>29</td>
+      <td>999</td>
+      <td>1.270860</td>
+      <td>0.104</td>
+      <td>0.174</td>
+    </tr>
+    <tr>
+      <th>Marasmus</th>
+      <th>Non-malnourished</th>
+      <td>27</td>
+      <td>999</td>
+      <td>0.911123</td>
+      <td>0.591</td>
+      <td>0.591</td>
+    </tr>
+  </tbody>
+</table>
+      </div>
+    </div>
+  
+
+
+    </div>
+    <script type="text/javascript">
+      if (window.frameElement) {
+          document.getElementById('q2templatesheader').remove();
+      }
+    </script>
+    
+    
+  </body>
+</html>

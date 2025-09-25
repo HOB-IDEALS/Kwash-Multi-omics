@@ -1,0 +1,44 @@
+sample_name	sample_code	match_id	subject_id	group	recruit_date	age_group	age	sex	triage	sample_weight_mg
+#q2:types	categorical	numeric	categorical	categorical	categorical	numeric	categorical	categorical	categorical	numeric
+1	M-023-G	8	23	Marasmus	13/11/2018	1	6-23m	M	Jaune	109
+2	K-013-G	5	13	Kwashiorkor	02/10/2018	1	6-23m	F	Jaune	67
+3	K-016-G	6	16	Kwashiorkor	03/10/2018	2	24-59 m	M	Jaune	87
+4	N-018-G	6	18	Non-malnourished	08/10/2018	2	24-59 m	M	Jaune	94
+5	M-017-G	6	17	Marasmus	09/10/2018	2	24-59 m	M	Jaune	108
+6	M-020-G	7	20	Marasmus	17/10/2018	1	6-23m	F	Vert	114
+7	K-028-G	10	28	Kwashiorkor	24/10/2018	1	6-23m	M	Jaune	101
+8	K-055-G	19	55	Kwashiorkor	07/11/2018	2	24-59 m	M	Jaune	109
+9	K-049-G	17	49	Kwashiorkor	07/11/2018	1	6-23m	M	Jaune	106
+10	M-008-G	3	8	Marasmus	13/11/2018	1	6-23m	M	Rouge	113
+11	K-007-G	3	7	Kwashiorkor	27/09/2018	1	6-23m	M	Rouge	118
+12	N-054-G	18	54	Non-malnourished	15/11/2018	1	6-23m	F	Vert	81
+13	N-030-G	10	30	Non-malnourished	16/11/2018	1	6-23m	M	Jaune	126
+14	N-033-G	11	33	Non-malnourished	19/11/2018	1	6-23m	M	Jaune	130
+15	M-R02-G	24	R02	Marasmus	29/11/2018	1	6-23m	F	Jaune	109
+16	K-091-G	31	91	Kwashiorkor	24/12/2018	2	24-59 m	M	Jaune	131
+17	N-084-G	28	84	Non-malnourished	02/01/2019	2	24-59 m	M	Jaune	64
+18	K-106-G	36	106	Kwashiorkor	21/01/2019	1	6-23m	M	Vert	185
+19	K-124-G	42	124	Kwashiorkor	21/02/2019	1	6-23m	M	Vert	137
+20	N-123-G	41	123	Non-malnourished	25/02/2019	1	6-23m	M	Vert	115
+22	M-050-G	17	50	Marasmus	14/03/2019	1	6-23m	M	Jaune	144
+23	K-133-G	45	133	Kwashiorkor	18/04/2019	2	24-59 m	F	Vert	132
+24	N-135-G	45	135	Non-malnourished	19/04/2019	2	24-59 m	F	Vert	125
+25	N-R21-G	3	R21	Non-malnourished	02/05/2019	1	6-23m	M	Rouge	213
+26	K-139-G	47	139	Kwashiorkor	02/05/2019	2	24-59 m	M	Jaune	155
+27	M-143-G	48	143	Marasmus	06/06/2019	2	24-59 m	F	Vert	119
+28	K-148-G	50	148	Kwashiorkor	15/07/2019	1	6-23m	M	Vert	105
+29	M-149-G	50	149	Marasmus	16/07/2019	1	6-23m	M	Vert	145
+30	K-151-G	51	151	Kwashiorkor	18/07/2019	2	24-59 m	F	Vert	112
+31	N-153-G	51	153	Non-malnourished	26/07/2019	2	24-59 m	F	Vert	127
+32	M-161-G	54	161	Marasmus	29/07/2019	1	6-23m	F	Vert	132
+33	N-159-G	53	159	Non-malnourished	30/07/2019	2	24-59 m	M	Vert	92
+34	K-172-G	58	172	Kwashiorkor	08/08/2019	1	6-23m	F	Jaune	117
+35	N-117-G	39	117	Non-malnourished	11/09/2019	2	24-59 m	M	Jaune	97
+36	M-083-G	28	83	Marasmus	27/09/2019	2	24-59 m	M	Jaune	114
+37	M-140-G	47	140	Marasmus	02/10/2019	2	24-59 m	M	Jaune	117
+38	M-188-G	63	188	Marasmus	03/10/2019	2	24-59 m	F	Jaune	117
+39	M-185-G	62	185	Marasmus	03/10/2019	2	24-59 m	M	Jaune	242
+40	K-202-G	68	202	Kwashiorkor	07/10/2019	1	6-23m	F	Vert	143
+41	N-R27-G	16	R27	Non-malnourished	28/10/2019	2	24-59 m	M	Jaune	210
+42	N-R29-G	11	R29	Non-malnourished	30/10/2019	1	6-23m	M	Jaune	129
+43	N-R28-G	10	R28	Non-malnourished	30/10/2019	1	6-23m	M	Jaune	197
