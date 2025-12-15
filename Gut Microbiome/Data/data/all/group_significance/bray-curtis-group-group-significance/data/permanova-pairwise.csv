@@ -1,4 +1,0 @@
-Group 1,Group 2,Sample size,Permutations,pseudo-F,p-value,q-value
-Kwashiorkor,Marasmus,28,999,1.2898660686525028,0.116,0.17400000000000002
-Kwashiorkor,Non-malnourished,29,999,1.2708602149809327,0.104,0.17400000000000002
-Marasmus,Non-malnourished,27,999,0.9111225971655564,0.591,0.591
